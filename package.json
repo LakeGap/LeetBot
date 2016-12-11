@@ -1,0 +1,28 @@
+{
+  "name": "leetbot",
+  "version": "0.0.0",
+  "description": "bot from leetcode team in slack",
+  "main": "bot.js",
+  "dependencies": {
+    "botkit": "^0.4.3",
+    "cheerio": "^0.22.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "./run.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/henryhoo/Leetbot.git"
+  },
+  "keywords": [
+    "leetcode",
+    "bot"
+  ],
+  "author": "henryhoo",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/henryhoo/Leetbot/issues"
+  },
+  "homepage": "https://github.com/henryhoo/Leetbot#readme"
+}
