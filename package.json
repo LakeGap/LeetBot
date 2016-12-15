@@ -5,7 +5,9 @@
   "main": "bot.js",
   "dependencies": {
     "botkit": "^0.4.3",
-    "cheerio": "^0.22.0"
+    "cheerio": "^0.22.0",
+    "cron": "^1.1.1",
+    "request-promise": "^4.1.1"
   },
   "devDependencies": {},
   "scripts": {

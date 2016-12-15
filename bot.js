@@ -3,59 +3,135 @@ if (!process.env.token) {
     process.exit(1);
 }
 
+
+//init leet page parsing package "cheerio" and "request"
+var cheerio = require('cheerio');
+var request = require('request');
+var rp = require('request-promise');
+//var url = 'https://leetcode.com/henryhoo/';
+var baseurl = 'https://leetcode.com/';
+//init bot package "botkit"
 var Botkit = require('botkit');
 var os = require('os');
 var controller = Botkit.slackbot({
     debug: true,
     json_file_store: './json_database',
 });
-//leet page parsing package init
-var cheerio = require('cheerio');
-var request = require('request');
-var url = 'https://leetcode.com/henryhoo/';
-
 var bot = controller.spawn({
     token: process.env.token
 }).startRTM();
+bot.configureIncomingWebhook({url: 'https://hooks.slack.com/services/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'});
 
-function updateUserLeet(err, message) {
-  var name = message.match[1];
-  controller.storage.users.get(message.user, function(err, user) {
-      if (!user) {
-          user = {
-              id: message.user,
-          };
-      }
-      user.leet = leet;
-      controller.storage.users.save(user, function(err, id) {
-          bot.reply(message, 'Got it. I will call you ' + user.name + ' from now on.');
-      });
-  });
-}
-controller.hears(['test'], 'direct_message,direct_mention,mention', function(bot, message) {
-    request(url, function(error, response, html){
-      if(!error) {
+//init time schedule package "cron"
+var cron = require('cron');
+//init cron job
+//00 55 23 * * 1-7 for everyday's 23:55, */10 * * * * * for every 10 sec
+var cronJob = cron.job("*/10 * * * * *", function(){
+    bot.botkit.debug("in cron");
+
+    controller.storage.users.all(function(err, all) {
+
+      var result = "today's progress:\n";
+      var promises = [];
+      all.forEach(function(node) {
+        promises.push(request({url:baseurl+node.leet}));
+      })
+
+      for (var i = 0, len = all.length; i < len; i++) {
+        bot.botkit.debug("in request");
+        url = baseurl + all[i].leet;
+        var curName = all[i].name;
+
+        rp(url)
+        .then(function (html) {
+        // Process html...
         bot.botkit.debug("in test");
         var $ = cheerio.load(html);
         var names = [];
         var times = [];
         var list = $('h3:contains("recent 10 accepted")').parent().next();
-        bot.botkit.debug("list is"+$('h3:contains("recent")').text());
         list.children().each(function(i, ele){
         //  bot.botkit.debug('in each' + $(this).children().first().next().next().text());
           names[i] = $(this).children().first().next().next().text();
-          names[i] = $(this).children().first().next().next().next().text();
-        $('.div').filter(function(){
-
+          times[i] = $(this).children().last().text();
           })
+        var count = 0;
+        for (var i = 0, len = times.length; i < len; i++) {
+          if (times[i].indexOf("day") > -1 || times[i].indexOf("days") > -1 || times[i].indexOf("week") > -1 || times[i].indexOf("weeks") > -1
+            || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
+          else{
+            count++;
+          }
+        }
+        //result = "hhh";
+        result = result + curName + ": " + countStars(count) + " star.\n";
         })
+        .catch(function (err) {
+        // Crawling failed...
+        })
+        .finally(function(){
+          bot.sendWebhook({
+            text: result,
+            channel: '#leetbot',
+          },function(err,res) {
+            // handle error
+          });
+        });
+        // request(url, function(error, response, html){
+        //   if(!error) {
+        //     bot.botkit.debug("in test");
+        //     var $ = cheerio.load(html);
+        //     var names = [];
+        //     var times = [];
+        //     var list = $('h3:contains("recent 10 accepted")').parent().next();
+        //     bot.botkit.debug("list is"+$('h3:contains("recent")').text());
+        //     list.children().each(function(i, ele){
+        //     //  bot.botkit.debug('in each' + $(this).children().first().next().next().text());
+        //       names[i] = $(this).children().first().next().next().text();
+        //       times[i] = $(this).children().last().text();
+        //     })
+        //   }
+        //   var count = 0;
+        //   for (var i = 0, len = times.length; i < len; i++) {
+        //     if (times[i].indexOf("day") > -1 || times[i].indexOf("days") > -1 || times[i].indexOf("week") > -1 || times[i].indexOf("weeks") > -1
+        //       || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
+        //     else{
+        //       count++;
+        //     }
+        //   }
+        // });
       }
-          bot.reply(message, names+times+"\n");
     });
-
-
 });
+cronJob.start();
 
+//testing cmd here
+controller.hears(['test'], 'direct_message,direct_mention,mention', function(bot, message) {
+    controller.storage.users.get(message.user, function(err, user) {
+      if (user && user.name) {
+        url = 'https://leetcode.com/'+user.leet;
+        request(url, function(error, response, html){
+          if(!error) {
+            bot.botkit.debug("in test");
+            var $ = cheerio.load(html);
+            var names = [];
+            var times = [];
+            var list = $('h3:contains("recent 10 accepted")').parent().next();
+            bot.botkit.debug("list is"+$('h3:contains("recent")').text());
+            list.children().each(function(i, ele){
+            //  bot.botkit.debug('in each' + $(this).children().first().next().next().text());
+              names[i] = $(this).children().first().next().next().text();
+              times[i] = $(this).children().first().next().next().next().text();
+            })
+          }
+              bot.reply(message, names+times+"\n");
+        });
+      } else {
+        bot.reply(message, 'user not found, please signup first');
+      }
+    })
+});
+//hello cmd
 controller.hears(['hello', 'hi'], 'direct_message,direct_mention,mention', function(bot, message) {
 
     bot.api.reactions.add({
@@ -77,7 +153,7 @@ controller.hears(['hello', 'hi'], 'direct_message,direct_mention,mention', funct
         }
     });
 });
-
+//call me cmd
 controller.hears(['call me (.*)', 'my name is (.*)', 'sign up user (.*)'], 'direct_message,direct_mention,mention', function(bot, message) {
     var name = message.match[1];
     controller.storage.users.get(message.user, function(err, user) {
@@ -92,24 +168,22 @@ controller.hears(['call me (.*)', 'my name is (.*)', 'sign up user (.*)'], 'dire
         });
     });
 });
-
-controller.hears(['sign up (.*) (.*)'], 'direct_message,direct_mention,mention', function(bot, message) {
-    var name = message.match[1];
-    var leet = message.match['\s(\w+)$'];
+//sign up cmd
+controller.hears(['sign up (.*)', 'signup (.*)'], 'direct_message,direct_mention,mention', function(bot, message) {
+    var leet = message.match[1];
     controller.storage.users.get(message.user, function(err, user) {
         if (!user) {
             user = {
                 id: message.user,
             };
         }
-        user.name = name;
         user.leet = leet;
         controller.storage.users.save(user, function(err, id) {
-            bot.reply(message, 'Got it. I will call you ' + user.name + ', your leetcode account is ' + user.leet +' from now on.');
+            bot.reply(message, 'Got it. Your leetcode account is ' + user.leet +' from now on.');
         });
     });
 });
-
+//who am i cmd
 controller.hears(['what is my name', 'who am i', 'my account'], 'direct_message,direct_mention,mention', function(bot, message) {
     controller.storage.users.get(message.user, function(err, user) {
 //        var leet = message.match[2];
@@ -173,7 +247,7 @@ controller.hears(['what is my name', 'who am i', 'my account'], 'direct_message,
         }
     });
 });
-
+//add leetcode cmd
 controller.hears(['add leetcode (.*)', 'update leetcode (.*)'], 'direct_message,direct_mention,mention', function(bot, message) {
     controller.storage.users.get(message.user, function(err, user) {
         if (!user || !user.name) {
@@ -207,7 +281,7 @@ controller.hears(['add leetcode (.*)', 'update leetcode (.*)'], 'direct_message,
                             }
                         ]);
                         convo.next();
-                    }, {'key': 'account'}); // store the results in a field called nickname
+                    }, {'key': 'account'}); // store the results in a field called account
 
                     convo.on('end', function(convo) {
                         if (convo.status == 'completed') {
@@ -235,7 +309,7 @@ controller.hears(['add leetcode (.*)', 'update leetcode (.*)'], 'direct_message,
     });
 });
 
-
+//shutdown cmd
 controller.hears(['shutdown'], 'direct_message,direct_mention,mention', function(bot, message) {
 
     bot.startConversation(message, function(err, convo) {
@@ -263,7 +337,7 @@ controller.hears(['shutdown'], 'direct_message,direct_mention,mention', function
     });
 });
 
-
+//who are you cmd
 controller.hears(['uptime', 'identify yourself', 'who are you', 'what is your name'],
     'direct_message,direct_mention,mention', function(bot, message) {
 
@@ -292,4 +366,20 @@ function formatUptime(uptime) {
 
     uptime = uptime + ' ' + unit;
     return uptime;
+}
+function countStars(count) {
+    var res = 0;
+    if (count >= 10) {
+        res = 5;
+    }
+    else if (count >= 5) {
+        res = 3;
+    }
+    else if (count >= 3 ) {
+        res = 2;
+    }
+    else if (count > 0 ) {
+        res = 1;
+    }
+    return res;
 }
