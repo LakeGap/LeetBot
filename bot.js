@@ -3,6 +3,25 @@ if (!process.env.token) {
     process.exit(1);
 }
 
+function synchAPICalls (urls) {
+  var url = urls.pop();
+  setTimeout(function(){
+    http.get(url,function(res){
+      var chunks = '';
+    res.on('data',function(d){
+      chunk += d;
+    });
+    res.on('end',function(){
+      //do stuffed with chunked result
+      if(urls.length){
+        synchAPICalls(URLs);
+      } else {
+        console.log('all done!');
+      }
+    })
+  })
+  },5000);
+}
 
 //init leet page parsing package "cheerio" and "request"
 var cheerio = require('cheerio');
@@ -27,49 +46,44 @@ var cron = require('cron');
 //init cron job
 //00 55 23 * * 1-7 for everyday's 23:55, */10 * * * * * for every 10 sec
 var cronJob = cron.job("*/10 * * * * *", function(){
-    bot.botkit.debug("in cron");
-
+    //get all users
     controller.storage.users.all(function(err, all) {
-
       var result = "today's progress:\n";
+      var results = [];
       var promises = [];
+      //init promises with each user's url
       all.forEach(function(node) {
-        promises.push(request({url:baseurl+node.leet}));
+        promises.push(rp({url: baseurl+node.leet}));
       })
-
-      for (var i = 0, len = all.length; i < len; i++) {
-        bot.botkit.debug("in request");
-        url = baseurl + all[i].leet;
-        var curName = all[i].name;
-
-        rp(url)
-        .then(function (html) {
-        // Process html...
-        bot.botkit.debug("in test");
-        var $ = cheerio.load(html);
-        var names = [];
-        var times = [];
-        var list = $('h3:contains("recent 10 accepted")').parent().next();
-        list.children().each(function(i, ele){
-        //  bot.botkit.debug('in each' + $(this).children().first().next().next().text());
-          names[i] = $(this).children().first().next().next().text();
-          times[i] = $(this).children().last().text();
-          })
-        var count = 0;
-        for (var i = 0, len = times.length; i < len; i++) {
-          if (times[i].indexOf("day") > -1 || times[i].indexOf("days") > -1 || times[i].indexOf("week") > -1 || times[i].indexOf("weeks") > -1
-            || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
-          else{
-            count++;
-          }
-        }
-        //result = "hhh";
-        result = result + curName + ": " + countStars(count) + " star.\n";
-        })
-        .catch(function (err) {
-        // Crawling failed...
-        })
-        .finally(function(){
+      //create promise all to wait for all quesy to finish. Responses will have same order with promises
+      Promise.all(promises)
+        .then((reponses) => {
+          var index = 0; //index for mapping reaponse and request
+          reponses.forEach(function(html) {
+            // process html
+            var $ = cheerio.load(html);
+            var names = [];
+            var times = [];
+            var list = $('h3:contains("recent 10 accepted")').parent().next();
+            list.children().each(function(i, ele){
+              //get all subject name and finsih time
+              names[i] = $(this).children().first().next().next().text();
+              times[i] = $(this).children().last().text();
+              })
+            var count = 0; //variable for counting today's finish
+            for (var i = 0, len = times.length; i < len; i++) {
+              bot.botkit.debug("time is" + times[i]);
+              if (times[i].indexOf("day") > -1 || times[i].indexOf("days") > -1 || times[i].indexOf("week") > -1 || times[i].indexOf("weeks") > -1
+                || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
+              else {
+                //finish today, add count
+                count++;
+              }
+            }
+            //add current user's progress to result
+            result = result + all[index++].name + ": " + countStars(count) + " star.\n";
+            });
+          //send bot message when all leetcode query is finished
           bot.sendWebhook({
             text: result,
             channel: '#leetbot',
@@ -77,30 +91,7 @@ var cronJob = cron.job("*/10 * * * * *", function(){
             // handle error
           });
         });
-        // request(url, function(error, response, html){
-        //   if(!error) {
-        //     bot.botkit.debug("in test");
-        //     var $ = cheerio.load(html);
-        //     var names = [];
-        //     var times = [];
-        //     var list = $('h3:contains("recent 10 accepted")').parent().next();
-        //     bot.botkit.debug("list is"+$('h3:contains("recent")').text());
-        //     list.children().each(function(i, ele){
-        //     //  bot.botkit.debug('in each' + $(this).children().first().next().next().text());
-        //       names[i] = $(this).children().first().next().next().text();
-        //       times[i] = $(this).children().last().text();
-        //     })
-        //   }
-        //   var count = 0;
-        //   for (var i = 0, len = times.length; i < len; i++) {
-        //     if (times[i].indexOf("day") > -1 || times[i].indexOf("days") > -1 || times[i].indexOf("week") > -1 || times[i].indexOf("weeks") > -1
-        //       || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
-        //     else{
-        //       count++;
-        //     }
-        //   }
-        // });
-      }
+
     });
 });
 cronJob.start();
@@ -131,6 +122,7 @@ controller.hears(['test'], 'direct_message,direct_mention,mention', function(bot
       }
     })
 });
+
 //hello cmd
 controller.hears(['hello', 'hi'], 'direct_message,direct_mention,mention', function(bot, message) {
 
