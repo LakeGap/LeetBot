@@ -2,27 +2,6 @@ if (!process.env.token) {
     console.log('Error: Specify token in environment');
     process.exit(1);
 }
-
-function synchAPICalls (urls) {
-  var url = urls.pop();
-  setTimeout(function(){
-    http.get(url,function(res){
-      var chunks = '';
-    res.on('data',function(d){
-      chunk += d;
-    });
-    res.on('end',function(){
-      //do stuffed with chunked result
-      if(urls.length){
-        synchAPICalls(URLs);
-      } else {
-        console.log('all done!');
-      }
-    })
-  })
-  },5000);
-}
-
 //init leet page parsing package "cheerio" and "request"
 var cheerio = require('cheerio');
 var request = require('request');
@@ -39,17 +18,16 @@ var controller = Botkit.slackbot({
 var bot = controller.spawn({
     token: process.env.token
 }).startRTM();
-bot.configureIncomingWebhook({url: 'https://hooks.slack.com/services/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'});
+//bot.configureIncomingWebhook({url: 'https://hooks.slack.com/services/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'});
 
 //init time schedule package "cron"
 var cron = require('cron');
 //init cron job
 //00 55 23 * * 1-7 for everyday's 23:55, */10 * * * * * for every 10 sec
-var cronJob = cron.job("*/10 * * * * *", function(){
+var dailyJob = cron.job("00 55 23 * * 1-7", function(){
     //get all users
     controller.storage.users.all(function(err, all) {
       var result = "today's progress:\n";
-      var results = [];
       var promises = [];
       //init promises with each user's url
       all.forEach(function(node) {
@@ -72,7 +50,7 @@ var cronJob = cron.job("*/10 * * * * *", function(){
               })
             var count = 0; //variable for counting today's finish
             for (var i = 0, len = times.length; i < len; i++) {
-              bot.botkit.debug("time is" + times[i]);
+              //bot.botkit.debug("time is" + times[i]);
               if (times[i].indexOf("day") > -1 || times[i].indexOf("days") > -1 || times[i].indexOf("week") > -1 || times[i].indexOf("weeks") > -1
                 || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
               else {
@@ -81,20 +59,51 @@ var cronJob = cron.job("*/10 * * * * *", function(){
               }
             }
             //add current user's progress to result
-            result = result + all[index++].name + ": " + countStars(count) + " star.\n";
+            var stars = countStars(count);
+            var weekStar = 0;
+            controller.storage.users.get(all[index].id, function(err, user) {
+                user.weekStar += stars;
+                weekStar = user.weekStar;
+                result = result + all[index++].name + ": " + stars + " stars. Week total: " + weekStar + " stars.\n";
+                controller.storage.users.save(user, function(err, id) {
+                });
             });
+          });
           //send bot message when all leetcode query is finished
-          bot.sendWebhook({
+          bot.say({
             text: result,
             channel: '#leetbot',
           },function(err,res) {
             // handle error
           });
         });
-
     });
 });
-cronJob.start();
+dailyJob.start();
+
+//00 59 23 * * 7
+var weeklyJob = cron.job("00 59 23 * * 7", function(){
+    //get all users
+    controller.storage.users.all(function(err, all) {
+      var result = "This week's leaderboard:\n";
+      var index = 1;
+      //Sort all user's weekStar, init the leadborad.
+      all.sort(function(a,b){return b.weekStar - a.weekStar;});
+      all.forEach(function(node) {
+        controller.storage.users.get(node.id, function(err, user) {
+            user.star += user.weekStar;
+            result += index++ + ". " + node.name + ", " + node.weekStar + "stars.\n";
+        });
+      })
+      bot.say({
+        text: result,
+        channel: '#leetbot',
+      },function(err,res) {
+        // handle error
+      });
+    });
+});
+weeklyJob.start();
 
 //testing cmd here
 controller.hears(['test'], 'direct_message,direct_mention,mention', function(bot, message) {
@@ -135,8 +144,6 @@ controller.hears(['hello', 'hi'], 'direct_message,direct_mention,mention', funct
             bot.botkit.log('Failed to add emoji reaction :(', err);
         }
     });
-
-
     controller.storage.users.get(message.user, function(err, user) {
         if (user && user.name) {
             bot.reply(message, 'Hello ' + user.name + '!!');
