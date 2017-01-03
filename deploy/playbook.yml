@@ -32,37 +32,44 @@
     #   become: true
 #      register: forever
 #    - debug: var=forever.stdout_lines
+    - file:
+        path: "./leetbot"
+        state: absent
 
     - name: clone app git repo
       git: repo=https://{{ githubuser }}:{{ githubpassword }}@github.com/LakeGap/LeetBot.git dest=./leetbot version=master
 
     - name: install npm package
-      npm: path=~/leetbot/
+      npm: path=~/leetbot
+
+    - name: stop all forever
+      command: forever stopall
 
     - name: start app with main.js
-      command: forever start ./app/index.js
+      command: forever start ~/leetbot/bot.js
+      become: true
 #      when: "forever_list.stdout.find('./app/main.js') == -1"
-    - name: update bash from apt if available
-      apt: name=bash state=latest update_cache=yes
-      when: ansible_os_family == 'Debian'
-      become: true
-    - name: update openssl from apt if available
-      apt: name=openssl state=latest
-      when: ansible_os_family == 'Debian'
-      become: true
-    - name: update openssh client from apt if available
-      apt: name=openssh-client state=latest update_cache=yes
-      when: ansible_os_family == 'Debian'
-      become: true
+    # - name: update bash from apt if available
+    #   apt: name=bash state=latest update_cache=yes
+    #   when: ansible_os_family == 'Debian'
+    #   become: true
+    # - name: update openssl from apt if available
+    #   apt: name=openssl state=latest
+    #   when: ansible_os_family == 'Debian'
+    #   become: true
+    # - name: update openssh client from apt if available
+    #   apt: name=openssh-client state=latest update_cache=yes
+    #   when: ansible_os_family == 'Debian'
+    #   become: true
 
-    - name: update openssh server from apt if available
-      apt: name=openssh-server state=latest update_cache=yes
-      when: ansible_os_family == 'Debian'
-      become: true
-    - name: update bash from apt if available
-      apt: name=bash state=latest update_cache=yes
-      when: ansible_os_family == 'Debian'
-      become: true
+    # - name: update openssh server from apt if available
+    #   apt: name=openssh-server state=latest update_cache=yes
+    #   when: ansible_os_family == 'Debian'
+    #   become: true
+    # - name: update bash from apt if available
+    #   apt: name=bash state=latest update_cache=yes
+    #   when: ansible_os_family == 'Debian'
+      # become: true
 #    - name: delete tmp folder
 #      file:
 #         path: "{{item}}"

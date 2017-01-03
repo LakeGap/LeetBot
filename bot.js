@@ -1,4 +1,4 @@
-if (!process.env.token) {
+if (!process.env.LEETBOT_KEY) {
     console.log('Error: Specify token in environment');
     process.exit(1);
 }
@@ -16,7 +16,7 @@ var controller = Botkit.slackbot({
     json_file_store: './json_database',
 });
 var bot = controller.spawn({
-    token: process.env.token
+    token: process.env.LEETBOT_KEY
 }).startRTM();
 //bot.configureIncomingWebhook({url: 'https://hooks.slack.com/services/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'});
 
