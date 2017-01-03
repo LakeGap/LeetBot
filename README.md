@@ -43,7 +43,9 @@ npm install
 ###Running the bot
 Run the command:	
 
-```	./start.sh```
+```
+./start.sh
+```
 
 And we can expect conversations like following ones:
 ![](./img/myname.png)
