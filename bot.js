@@ -78,7 +78,9 @@ var dailyJob = cron.job("00 55 23 * * 1-7", function(){
           });
         });
     });
-});
+},
+undefined, true,'America/new_york'
+);
 dailyJob.start();
 
 //00 59 23 * * 7
