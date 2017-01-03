@@ -1,0 +1,1 @@
+node0 ansible_ssh_host=ec2-54-149-175-92.us-west-2.compute.amazonaws.com ansible_ssh_user=ubuntu ansible_ssh_private_key_file=~/.keys/node.key

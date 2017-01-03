@@ -1,0 +1,82 @@
+---
+- hosts: node0
+  vars_prompt:
+    - name: githubuser
+      prompt: Enter your github username
+      private: no
+
+    - name: githubpassword
+      prompt: Enter your github password
+      private: yes
+
+  tasks:
+    # - name: add apt key for nodesource
+    #   apt_key: url=https://deb.nodesource.com/gpgkey/nodesource.gpg.key
+    #   become: true
+    #
+    # - name: add repo for nodesource
+    #   apt_repository:
+    #      repo: 'deb https://deb.nodesource.com/node_0.10 {{ ansible_distribution_release }} main'
+    #      update_cache: yes
+    #   become: true
+    #
+    # - name: install nodejs
+    #   apt: name=nodejs-legacy
+    #   become: true
+    # - name: install npm
+    #   apt: name=npm
+    #   become: true
+    #
+    # - name: install forever
+    #   npm:  name=forever global=true
+    #   become: true
+#      register: forever
+#    - debug: var=forever.stdout_lines
+
+    - name: clone app git repo
+      git: repo=https://{{ githubuser }}:{{ githubpassword }}@github.com/LakeGap/LeetBot.git dest=./leetbot version=master
+
+    - name: install npm package
+      npm: path=~/leetbot/
+
+    - name: start app with main.js
+      command: forever start ./app/index.js
+#      when: "forever_list.stdout.find('./app/main.js') == -1"
+    - name: update bash from apt if available
+      apt: name=bash state=latest update_cache=yes
+      when: ansible_os_family == 'Debian'
+      become: true
+    - name: update openssl from apt if available
+      apt: name=openssl state=latest
+      when: ansible_os_family == 'Debian'
+      become: true
+    - name: update openssh client from apt if available
+      apt: name=openssh-client state=latest update_cache=yes
+      when: ansible_os_family == 'Debian'
+      become: true
+
+    - name: update openssh server from apt if available
+      apt: name=openssh-server state=latest update_cache=yes
+      when: ansible_os_family == 'Debian'
+      become: true
+    - name: update bash from apt if available
+      apt: name=bash state=latest update_cache=yes
+      when: ansible_os_family == 'Debian'
+      become: true
+#    - name: delete tmp folder
+#      file:
+#         path: "{{item}}"
+#         state: absent
+#         with_fileglob:
+#             - /tmp/*
+#    - name: find file in tmp folder
+#    - find:
+#        name: find file in tmp
+#        paths: "/tmp"
+#        patterns: "*"
+#      register: result
+#    - file:
+#        path: "{{item.path}}" #correction code
+#        state: absent
+#      with_items: result.files
+#      become: true

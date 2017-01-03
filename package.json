@@ -15,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/henryhoo/Leetbot.git"
+    "url": "git+https://github.com/LakeGap/LeetBot.git"
   },
   "keywords": [
     "leetcode",
@@ -24,7 +24,7 @@
   "author": "henryhoo",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/henryhoo/Leetbot/issues"
+    "url": "https://github.com/LakeGap/LeetBot/issues"
   },
-  "homepage": "https://github.com/henryhoo/Leetbot#readme"
+  "homepage": "https://github.com/LakeGap/LeetBot#readme"
 }
