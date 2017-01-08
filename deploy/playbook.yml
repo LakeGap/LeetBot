@@ -40,14 +40,19 @@
       git: repo=https://{{ githubuser }}:{{ githubpassword }}@github.com/LakeGap/LeetBot.git dest=./leetbot version=master
 
     - name: install npm package
-      npm: path=~/leetbot
+      npm: path=~/leetbot/
 
     - name: stop all forever
       command: forever stopall
+      # become: true
 
-    - name: start app with main.js
-      command: forever start ~/leetbot/bot.js
-      become: true
+    - name: Go to the leetbot folder
+      command: chdir=~/leetbot
+
+    - name: start bot with bot.js
+      command: forever start bot.js
+      # when: "forever_list.stdout.find('/path/to/app.js') == -1"
+      # become: true
 #      when: "forever_list.stdout.find('./app/main.js') == -1"
     # - name: update bash from apt if available
     #   apt: name=bash state=latest update_cache=yes

@@ -69,6 +69,15 @@ var dailyJob = cron.job("00 55 23 * * 1-7", function(){
                 });
             });
           });
+          //to do: try to move add result code to here.
+          // all.sort(function(a,b){return b.weekStar - a.weekStar;});
+          // all.forEach(function(node) {
+          //   controller.storage.users.get(node.id, function(err, user) {
+          //       user.star += user.weekStar;
+          //       result += index++ + ". " + node.name + ", " + node.weekStar + "stars.\n";
+          //   });
+          // })
+
           //send bot message when all leetcode query is finished
           bot.say({
             text: result,
@@ -128,6 +137,16 @@ controller.hears(['test'], 'direct_message,direct_mention,mention', function(bot
           }
               bot.reply(message, names+times+"\n");
         });
+      } else {
+        bot.reply(message, 'user not found, please signup first');
+      }
+    })
+});
+//my status cmd
+controller.hears(['my status'], 'direct_message,', function(bot, message) {
+    controller.storage.users.get(message.user, function(err, user) {
+      if (user && user.name) {
+        bot.reply(message, "hi "+user.name+","+"your binded leetcode account is " + user.leet + ", you current star is: " + user.stars + ".\n This week you have got " + user.weekStar + "stars".);
       } else {
         bot.reply(message, 'user not found, please signup first');
       }
