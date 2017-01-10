@@ -42,6 +42,7 @@ var dailyJob = cron.job("00 55 23 * * 1-7", function(){
             var $ = cheerio.load(html);
             var names = [];
             var times = [];
+            var nameSet = new Set();
             var list = $('h3:contains("recent 10 accepted")').parent().next();
             list.children().each(function(i, ele){
               //get all subject name and finsih time
@@ -55,31 +56,25 @@ var dailyJob = cron.job("00 55 23 * * 1-7", function(){
                 || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
               else {
                 //finish today, add count
-                count++;
+                if (!nameSet.has(names[i])) {
+                  count++;
+                  nameSet.add(names[i]);
+                }
               }
             }
             //add current user's progress to result
             var stars = countStars(count);
+            count = 0;
             //var weekStar = 0;
             controller.storage.users.get(all[index].id, function(err, user) {
                 user.weekStar += stars;
                 user.todayStar = stars;
-                //weekStar = user.weekStar;
-                //result = result + all[index++].name + ": " + stars + " stars. Week total: " + weekStar + " stars.\n";
+                weekStar = user.weekStar;
+                result = result + all[index++].name + ": " + stars + " stars. Week total: " + weekStar + " stars.\n";
                 controller.storage.users.save(user, function(err, id) {
                 });
             });
           });
-          //to do: try to move add result code to here.
-          var rank = 0;
-          all.sort(function(a,b){return b.weekStar - a.weekStar;});
-          all.forEach(function(node) {
-            controller.storage.users.get(node.id, function(err, user) {
-                user.star += user.weekStar;
-                result += rank++ + ". " + node.name + ", today's stars: " + node.todayStar + ". Total stars: "+ node.weekStar + "\n";
-            });
-          })
-
           //send bot message when all leetcode query is finished
           bot.say({
             text: result,
@@ -136,6 +131,7 @@ controller.hears(['test'], 'direct_message,direct_mention,mention', function(bot
           var $ = cheerio.load(html);
           var names = [];
           var times = [];
+          var nameSet = new Set();
           var list = $('h3:contains("recent 10 accepted")').parent().next();
           list.children().each(function(i, ele){
             //get all subject name and finsih time
@@ -149,31 +145,35 @@ controller.hears(['test'], 'direct_message,direct_mention,mention', function(bot
               || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
             else {
               //finish today, add count
-              count++;
+              if (!nameSet.has(names[i])) {
+                count++;
+                nameSet.add(names[i]);
+              }
             }
           }
           //add current user's progress to result
           var stars = countStars(count);
+          count = 0;
           //var weekStar = 0;
-          controller.storage.users.get(all[index].id, function(err, user) {
+          controller.storage.users.get(all[index++].id, function(err, user) {
               user.weekStar += stars;
               user.todayStar = stars;
-              //weekStar = user.weekStar;
               //result = result + all[index++].name + ": " + stars + " stars. Week total: " + weekStar + " stars.\n";
               controller.storage.users.save(user, function(err, id) {
               });
           });
-        });
-        //to do: try to move add result code to here.
-        var rank = 0;
-        all.sort(function(a,b){return b.weekStar - a.weekStar;});
-        all.forEach(function(node) {
-          controller.storage.users.get(node.id, function(err, user) {
-              user.star += user.weekStar;
-              result += rank++ + ". " + node.name + ", today's stars: " + node.todayStar + ". Total stars: "+ node.weekStar + "\n";
-          });
-        })
 
+          var rank = 1;
+          // bot.botkit.debug("index:" + index + "all length" + all.length);
+          if (index == all.length - 1) {
+            all.sort(function(a,b){return b.todayStar - a.todayStar;});
+            all.forEach(function(node) {
+              result += rank++ + ". " + node.name + ", toady's stars: " + node.todayStar + ", already week stars: " + node.weekStar + "\n";
+              controller.storage.users.get(node.id, function(err, user) {
+              });
+            })
+          }
+        });
         //send bot message when all leetcode query is finished
         bot.say({
           text: result,
@@ -184,15 +184,68 @@ controller.hears(['test'], 'direct_message,direct_mention,mention', function(bot
       });
   });
 });
+
 //my status cmd
-controller.hears(['my status'], 'direct_message,', function(bot, message) {
-    controller.storage.users.get(message.user, function(err, user) {
-      if (user && user.name) {
-        bot.reply(message, "hi "+user.name+","+"your binded leetcode account is " + user.leet + ", you current star is: " + user.stars + ".\n This week you have got " + user.weekStar + "stars".);
-      } else {
-        bot.reply(message, 'user not found, please signup first');
-      }
+controller.hears(['status'], 'direct_message,', function(bot, message) {
+  controller.storage.users.all(function(err, all) {
+    var result = "today's progress:\n";
+    var promises = [];
+    //init promises with each user's url
+    all.forEach(function(node) {
+      promises.push(rp({url: baseurl+node.leet}));
     })
+    //create promise all to wait for all quesy to finish. Responses will have same order with promises
+    Promise.all(promises)
+      .then((reponses) => {
+        var index = 0; //index for mapping reaponse and request
+        reponses.forEach(function(html) {
+          // process html
+          var $ = cheerio.load(html);
+          var names = [];
+          var times = [];
+          var nameSet = new Set();
+          var list = $('h3:contains("recent 10 accepted")').parent().next();
+          list.children().each(function(i, ele){
+            //get all subject name and finsih time
+            names[i] = $(this).children().first().next().next().text();
+            times[i] = $(this).children().last().text();
+            })
+          var count = 0; //variable for counting today's finish
+          for (var i = 0, len = times.length; i < len; i++) {
+            //bot.botkit.debug("time is" + times[i]);
+            if (times[i].indexOf("day") > -1 || times[i].indexOf("days") > -1 || times[i].indexOf("week") > -1 || times[i].indexOf("weeks") > -1
+              || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
+            else {
+              //finish today, add count
+              if (!nameSet.has(names[i])) {
+                count++;
+                nameSet.add(names[i]);
+              }
+            }
+          }
+          //add current user's progress to result
+          var stars = countStars(count);
+          controller.storage.users.get(all[index++].id, function(err, user) {
+              user.todayStar = stars;
+              controller.storage.users.save(user, function(err, id) {
+              });
+          });
+
+          var rank = 1;
+          // bot.botkit.debug("index:" + index + "all length" + all.length);
+          if (index == all.length) {
+            all.sort(function(a,b){return b.todayStar - a.todayStar;});
+            all.forEach(function(node) {
+              result += rank++ + ". " + node.name + ", toady's stars: " + node.todayStar + ", already week stars: " + node.weekStar + "\n";
+              controller.storage.users.get(node.id, function(err, user) {
+              });
+            })
+          }
+        });
+        //send bot message when all leetcode query is finished
+        bot.reply(message, result);
+      });
+  });
 });
 
 //hello cmd
