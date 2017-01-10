@@ -123,14 +123,11 @@ controller.hears(['test'], 'direct_message,direct_mention,mention', function(bot
       promises.push(rp({url: baseurl+node.leet}));
     })
     //create promise all to wait for all quesy to finish. Responses will have same order with promises
-bot.botkit.debug("step 1");
     Promise.all(promises)
       .then((reponses) => {
-bot.botkit.debug("step 2");
         var index = 0; //index for mapping reaponse and request
         reponses.forEach(function(html) {
           // process html
-bot.botkit.debug("step 3");
           var $ = cheerio.load(html);
           var names = [];
           var times = [];
@@ -155,28 +152,24 @@ bot.botkit.debug("step 3");
             }
           }
           //add current user's progress to result
-bot.botkit.debug("step 4");
           var stars = countStars(count);
           count = 0;
           //var weekStar = 0;
-          controller.storage.users.get(all[index++].id, function(err, user) {
+          controller.storage.users.get(all[index].id, function(err, user) {
               user.weekStar += stars;
               user.todayStar = stars;
+              weekStar = user.weekStar;
               result = result + all[index++].name + ": " + stars + " stars. Week total: " + weekStar + " stars.\n";
               controller.storage.users.save(user, function(err, id) {
               });
           });
-bot.botkit.debug("step 5");
-
         });
         //send bot message when all leetcode query is finished
-bot.botkit.debug("step 6");
         bot.say({
           text: result,
           channel: '#leetbot',
         },function(err,res) {
           // handle error
-bot.botkit.debug("saying error");
         });
       });
   });
