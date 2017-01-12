@@ -25,6 +25,41 @@ var bot = controller.spawn({
 //init time schedule package "cron"
 var cron = require('cron');
 var timezone = 'America/new_york';
+
+var hourlyJob = cron.job("* * */1 * * *", function(){
+    controller.storage.users.all(function(err, all) {
+      //init with each user's url
+      var urls = [];
+      all.forEach(function(node) {
+        urls.push({url: baseurl+node.leet});
+      })
+      var getPage = urls.map(rp);
+      var pages = Promise.all(getPage);
+      //create promise all to wait for all quesy to finish. Responses will have same order with promises
+      pages.then(function(response) {
+        return Promise.all(response.map(homeParser));
+      }).then(function(json){
+        var objs = Promise.all(json.map(timeFilter));
+        return objs;
+      })
+      .then(data => {
+        return updateCurrentStatus(data, all, function(result) {
+          // bot.say({
+          //   text: result,
+          //   channel: '#leetbot',
+          // },function(err,res) {
+          //   // handle error
+          // });
+        });
+      }).then(data => {console.log(data);})
+      .catch(function(error) {
+        bot.botkit.debug(error);
+      });
+    });
+},
+undefined, true, timezone
+);
+hourlyJob.start();
 //init cron job
 //00 55 23 * * 1-7 for everyday's 23:55, */10 * * * * * for every 10 sec
 var dailyJob = cron.job("00 55 23 * * 1-7", function(){
