@@ -358,19 +358,19 @@ function afterOneDay(all, callback) {
 
   var index = 1;
   //Sort all user's weekStar, init the leadborad.
-  all.sort(function(a,b){return b.weekStar - a.weekStar;});
+  all.sort(function(a,b){return (b.weekStar + b.todayStar) - (a.weekStar + a.todayStar);});
   all.forEach(function(node) {
     controller.storage.users.get(node.id, function(err, user) {
         result += index++ + ". " + user.name + ": " + user.todayStar + " stars. Week total: ";
         var ws = user.weekStar + user.todayStar;
-        user.weekStar += ws;
+        user.weekStar = ws;
         user.todayStar = 0;
         user.todayCount = 0;
         user.oldSubmissions = user.todaySubmissions;
         user.todaySubmissions = [];
         user.oldLinks = user.todayLinks;
         user.todayLinks = [];
-        user.weekRank = index;
+        user.weekRank = index - 1;
         result += ws + " stars.\n";
         controller.storage.users.save(user, function(err, id) {
         });
@@ -388,7 +388,7 @@ function afterOneWeek(all, callback) {
   var result = "This week's leaderboard:\n";
   var index = 1;
   //Sort all user's weekStar, init the leadborad.
-  all.sort(function(a,b){return b.weekStar - a.weekStar;});
+  all.sort(function(a,b){return (b.weekStar + b.todayStar) - (a.weekStar + b.todayStar);});
   all.forEach(function(node) {
     controller.storage.users.get(node.id, function(err, user) {
         user.star += user.weekStar;
