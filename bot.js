@@ -2,9 +2,11 @@ if (!process.env.LEETBOT_KEY) {
     console.log('Error: Specify token in environment');
     process.exit(1);
 }
+//import helper
+var botHelper = require("./helper.js");
 //init leet page parsing package "cheerio" and "request"
 var cheerio = require('cheerio');
-var request = require('request');
+// var request = require('request');
 var rp = require('request-promise');
 //var url = 'https://leetcode.com/henryhoo/';
 var baseurl = 'https://leetcode.com/';
@@ -22,149 +24,47 @@ var bot = controller.spawn({
 
 //init time schedule package "cron"
 var cron = require('cron');
+var timezone = 'America/new_york';
 //init cron job
 //00 55 23 * * 1-7 for everyday's 23:55, */10 * * * * * for every 10 sec
 var dailyJob = cron.job("00 55 23 * * 1-7", function(){
-    //get all users
     controller.storage.users.all(function(err, all) {
-      var result = "today's progress:\n";
-      var promises = [];
-      //init promises with each user's url
+      //init with each user's url
+      var urls = [];
       all.forEach(function(node) {
-        promises.push(rp({url: baseurl+node.leet}));
+        urls.push({url: baseurl+node.leet});
       })
+      var getPage = urls.map(rp);
+      var pages = Promise.all(getPage);
       //create promise all to wait for all quesy to finish. Responses will have same order with promises
-      Promise.all(promises)
-        .then((reponses) => {
-          var index = 0; //index for mapping reaponse and request
-          reponses.forEach(function(html) {
-            // process html
-            var $ = cheerio.load(html);
-            var names = [];
-            var times = [];
-            var nameSet = new Set();
-            var list = $('h3:contains("recent 10 accepted")').parent().next();
-            list.children().each(function(i, ele){
-              //get all subject name and finsih time
-              names[i] = $(this).children().first().next().next().text();
-              times[i] = $(this).children().last().text();
-              })
-            var count = 0; //variable for counting today's finish
-            for (var i = 0, len = times.length; i < len; i++) {
-              //bot.botkit.debug("time is" + times[i]);
-              if (times[i].indexOf("day") > -1 || times[i].indexOf("days") > -1 || times[i].indexOf("week") > -1 || times[i].indexOf("weeks") > -1
-                || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
-              else {
-                //finish today, add count
-                if (!nameSet.has(names[i])) {
-                  count++;
-                  nameSet.add(names[i]);
-                }
-              }
-            }
-            //add current user's progress to result
-            var stars = countStars(count);
-            count = 0;
-            //var weekStar = 0;
-            controller.storage.users.get(all[index].id, function(err, user) {
-                user.weekStar += stars;
-                user.todayStar = stars;
-                weekStar = user.weekStar;
-                result = result + all[index++].name + ": " + stars + " stars. Week total: " + weekStar + " stars.\n";
-                controller.storage.users.save(user, function(err, id) {
-                });
-            });
-          });
-          //send bot message when all leetcode query is finished
-          bot.say({
-            text: result,
-            channel: '#leetbot',
-          },function(err,res) {
-            // handle error
-          });
+      pages.then(function(response) {
+        return Promise.all(response.map(homeParser));
+      }).then(function(json){
+        var objs = Promise.all(json.map(timeFilter));
+        return objs;
+      })
+      .then(data => {
+        return updateCurrentStatus(data, all, function(result) {
+          // bot.say({
+          //   text: result,
+          //   channel: '#leetbot',
+          // },function(err,res) {
+          //   // handle error
+          // });
         });
+      }).then(data => {console.log(data);})
+      .catch(function(error) {
+        bot.botkit.debug(error);
+      });
     });
 },
-undefined, true,'America/new_york'
+undefined, true, timezone
 );
 dailyJob.start();
 
-//00 59 23 * * 7
-var weeklyJob = cron.job("00 59 23 * * 7", function(){
-    //get all users
-    controller.storage.users.all(function(err, all) {
-      var result = "This week's leaderboard:\n";
-      var index = 1;
-      //Sort all user's weekStar, init the leadborad.
-      all.sort(function(a,b){return b.weekStar - a.weekStar;});
-      all.forEach(function(node) {
-        controller.storage.users.get(node.id, function(err, user) {
-            user.star += user.weekStar;
-            result += index++ + ". " + node.name + ", " + node.weekStar + "stars.\n";
-        });
-      })
-      bot.say({
-        text: result,
-        channel: '#leetbot',
-      },function(err,res) {
-        // handle error
-      });
-    });
-});
-weeklyJob.start();
-
-//testing cmd here
-controller.hears(['test'], 'direct_message,direct_mention,mention', function(bot, message) {
+var dailyJob2 = cron.job("00 57 23 * * 1-7", function(){
   controller.storage.users.all(function(err, all) {
-    var result = "today's progress:\n";
-    var promises = [];
-    //init promises with each user's url
-    all.forEach(function(node) {
-      promises.push(rp({url: baseurl+node.leet}));
-    })
-    //create promise all to wait for all quesy to finish. Responses will have same order with promises
-    Promise.all(promises)
-      .then((reponses) => {
-        var index = 0; //index for mapping reaponse and request
-        reponses.forEach(function(html) {
-          // process html
-          var $ = cheerio.load(html);
-          var names = [];
-          var times = [];
-          var nameSet = new Set();
-          var list = $('h3:contains("recent 10 accepted")').parent().next();
-          list.children().each(function(i, ele){
-            //get all subject name and finsih time
-            names[i] = $(this).children().first().next().next().text();
-            times[i] = $(this).children().last().text();
-            })
-          var count = 0; //variable for counting today's finish
-          for (var i = 0, len = times.length; i < len; i++) {
-            //bot.botkit.debug("time is" + times[i]);
-            if (times[i].indexOf("day") > -1 || times[i].indexOf("days") > -1 || times[i].indexOf("week") > -1 || times[i].indexOf("weeks") > -1
-              || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
-            else {
-              //finish today, add count
-              if (!nameSet.has(names[i])) {
-                count++;
-                nameSet.add(names[i]);
-              }
-            }
-          }
-          //add current user's progress to result
-          var stars = countStars(count);
-          count = 0;
-          //var weekStar = 0;
-          controller.storage.users.get(all[index].id, function(err, user) {
-              user.weekStar += stars;
-              user.todayStar = stars;
-              weekStar = user.weekStar;
-              result = result + all[index++].name + ": " + stars + " stars. Week total: " + weekStar + " stars.\n";
-              controller.storage.users.save(user, function(err, id) {
-              });
-          });
-        });
-        //send bot message when all leetcode query is finished
+      afterOneDay(all, function(result) {
         bot.say({
           text: result,
           channel: '#leetbot',
@@ -172,71 +72,294 @@ controller.hears(['test'], 'direct_message,direct_mention,mention', function(bot
           // handle error
         });
       });
-  });
+    });
+},
+undefined, true, timezone
+);
+dailyJob2.start();
+
+//00 59 23 * * 7
+var weeklyJob = cron.job("00 59 23 * * 7", function(){
+  controller.storage.users.all(function(err, all) {
+      afterOneWeek(all, function(result) {
+        bot.say({
+          text: result,
+          channel: '#leetbot',
+        },function(err,res) {
+          // handle error
+        });
+      });
+    });
+},
+undefined, true, timezone
+);
+weeklyJob.start();
+
+//testing cmd here
+controller.hears(['day'], 'direct_message', function(bot, message) {
+  controller.storage.users.all(function(err, all) {
+      afterOneDay(all, function(result) {
+        bot.say({
+          text: result,
+          channel: '#leetbot',
+        },function(err,res) {
+          // handle error
+        });
+      });
+    });
+});
+
+controller.hears(['week'], 'direct_message', function(bot, message) {
+  controller.storage.users.all(function(err, all) {
+      afterOneWeek(all, function(result) {
+        bot.say({
+          text: result,
+          channel: '#leetbot',
+        },function(err,res) {
+          // handle error
+        });
+      });
+    });
 });
 
 //my status cmd
-controller.hears(['status'], 'direct_message,', function(bot, message) {
+controller.hears(['status'], 'direct_message', function(bot, message) {
   controller.storage.users.all(function(err, all) {
-    var result = "today's progress:\n";
-    var promises = [];
-    //init promises with each user's url
+    //init with each user's url
+    var urls = [];
     all.forEach(function(node) {
-      promises.push(rp({url: baseurl+node.leet}));
+      urls.push({url: baseurl+node.leet});
     })
+    var getPage = urls.map(rp);
+    var pages = Promise.all(getPage);
     //create promise all to wait for all quesy to finish. Responses will have same order with promises
-    Promise.all(promises)
-      .then((reponses) => {
-        var index = 0; //index for mapping reaponse and request
-        reponses.forEach(function(html) {
-          // process html
-          var $ = cheerio.load(html);
-          var names = [];
-          var times = [];
-          var nameSet = new Set();
-          var list = $('h3:contains("recent 10 accepted")').parent().next();
-          list.children().each(function(i, ele){
-            //get all subject name and finsih time
-            names[i] = $(this).children().first().next().next().text();
-            times[i] = $(this).children().last().text();
-            })
-          var count = 0; //variable for counting today's finish
-          for (var i = 0, len = times.length; i < len; i++) {
-            //bot.botkit.debug("time is" + times[i]);
-            if (times[i].indexOf("day") > -1 || times[i].indexOf("days") > -1 || times[i].indexOf("week") > -1 || times[i].indexOf("weeks") > -1
-              || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
-            else {
-              //finish today, add count
-              if (!nameSet.has(names[i])) {
-                count++;
-                nameSet.add(names[i]);
+    pages.then(function(response) {
+      return Promise.all(response.map(homeParser));
+    }).then(function(json){
+      var objs = Promise.all(json.map(timeFilter));
+      return objs;
+    })
+    .then(data => {
+      return updateCurrentStatus(data, all, function(result) {
+        bot.reply(message, result);
+      });
+    }).then(data => {console.log(data);})
+    .catch(function(error) {
+      bot.botkit.debug(error);
+    });
+  });
+});
+
+controller.hears(['my progress'], 'direct_message', function(bot, message) {
+  controller.storage.users.get(message.user, function(err, user) {
+      var res = "";
+      console.log(user);
+      if (user && user.name) {
+         res += 'Hello ' + user.name + '\n';
+         res += "Today's finishes: " + user.todayCount + ", which stands for " + user.todayStar + " stars \n";
+         res += "Week's total stars: " + user.weekStar + ", your rank is " + user.weekRank + "\n";
+         res += "Submit history:\n";
+         if (user.todaySubmissions != null) {
+           var index = 0;
+           user.todaySubmissions.forEach(function (each) {
+             res += each + ": " + user.todayLinks[index++] + "\n";
+           })
+         }
+         if (user.oldSubmissions != null) {
+           var index = 0;
+           user.oldSubmissions.forEach(function (each) {
+             res += each + ": " + user.oldLinks[index++] + "\n";
+           })
+         }
+          bot.reply(message, res);
+      }
+  });
+});
+
+var homeParser = function (html) {
+  bot.botkit.debug("in homeParser");
+  var $ = cheerio.load(html);
+  var names = [];
+  var times = [];
+  var links = [];
+  var nameSet = new Set();
+  var count = 0;
+  return new Promise((resolve, reject) => {
+
+    if ($('h3:contains("recent 10 accepted")') == null)
+      return reject("leetcode homepage no found\n");
+    else {
+      var list = $('h3:contains("recent 10 accepted")').parent().next();
+      list.children().each(function(i, ele){
+        //get all subject name and finsih time
+        links[i] = $(this).attr('href');
+        names[i] = $(this).children().first().next().next().text();
+        times[i] = $(this).children().last().text().replace(/\r?\n|\r/g, " ").trim();
+      })
+      return resolve(JSON.stringify({"names": names, "times":times, "links":links}));
+      // return resolve([names, times, links]);
+    }
+  })
+}
+
+var timeFilter = function (json) {
+  bot.botkit.debug("in currentStatus");
+  var obj = JSON.parse(json);
+  var names = [];
+  var links = [];
+  return new Promise((resolve, reject) => {
+    if (obj == null)
+      return reject("count star error\n");
+    else {
+        var nameSet = new Set();
+        var times = obj.times;
+        //filter out those should be count as today's finish
+        for (var i = 0; i < times.length; i++){
+          if (times[i].indexOf("day") > -1 || times[i].indexOf("days") > -1 || times[i].indexOf("week") > -1 || times[i].indexOf("weeks") > -1
+            || times[i].indexOf("month") > -1 || times[i].indexOf("months") > -1|| times[i].indexOf("year") > -1|| times[i].indexOf("years") > -1){}
+          else {
+            var now = new Date();
+            var end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 55, 00);
+            var s = times[i].replace(new RegExp(String.fromCharCode(160), "g"), " ");
+            // console.log(s);
+            //use regex to caculate how many ms ago
+            var hregex = /(\d+) hour/g;
+            var hour = hregex.exec(s);
+            var mregex = /(\d+) minute/g;
+            var min = mregex.exec(s);
+            var sregex = /(\d+) second/g;
+            var sec = sregex.exec(s);
+            var max = now.getTime() - end.getTime();//how many ms have been after yesterday 23:55:00
+            var escape = 1000 * ((hour == null ? 0 : hour[1] * 3600) + (min == null ? 0 : min[1] * 60) + (sec == null ? 0 : sec[1]));
+            //if within max scope, this subject should be count as today's finish
+            if (escape < max) {
+              // console.log("in")
+              if (!nameSet.has(obj.names[i])) {
+                nameSet.add(obj.names[i]);
+                names.push(obj.names[i]);
+                links.push(obj.links[i]);
               }
             }
           }
-          //add current user's progress to result
-          var stars = countStars(count);
-          controller.storage.users.get(all[index++].id, function(err, user) {
-              user.todayStar = stars;
-              controller.storage.users.save(user, function(err, id) {
-              });
-          });
+        }
+      // return resolve(JSON.stringify({"names": names, "links":links}));
+      // return resolve({"names": names, "links":links});
+      return resolve([names, links]);
+      // return resolve("test");
+    }
+  })
+}
 
-          var rank = 1;
-           bot.botkit.debug("index:" + index + "all length" + all.length);
-          if (index == all.length) {
-            all.sort(function(a,b){return b.todayStar - a.todayStar;});
-            all.forEach(function(node) {
-              result += rank++ + ". " + node.name + ", toady's stars: " + node.todayStar + ", already week stars: " + node.weekStar + "\n";
-              controller.storage.users.get(node.id, function(err, user) {
-              });
-            })
+function updateCurrentStatus (lists, all, callback) {
+  bot.botkit.debug("in updateUserStar");
+  // console.log(s)
+  // var obj = JSON.parse(s);
+  // console.log(obj);
+  var result = "Today's progress:\n"
+  for (var i = 0; i < lists.length; i++) {
+    controller.storage.users.get(all[i].id, function(err, user) {
+        var nameSet = new Set();
+        var subs = user.todaySubmissions;
+        var count = 0;
+        if (user.todayLinks == null) {
+          user.todayLinks = [];
+        }
+        if (subs == null) {
+          user.todaySubmissions = [];
+        }
+        if (subs != null) {
+          subs.forEach(function (sub) {
+            nameSet.add(sub);
+          })
+        }
+        var names = lists[i][0];
+        var links = lists[i][1];
+        // console.log(names);
+        if (names != null) {
+          for (var k = 0; k < names.length; k++) {
+            if (!nameSet.has(names[k])) {
+              nameSet.add(names[k]);
+              user.todaySubmissions.push(names[k]);
+              user.todayLinks.push(baseurl + links[k]);
+              count++;
+            }
           }
+        }
+        console.log(count);
+        user.todayCount += count;
+        user.todayStar = countStars(user.todayCount);
+        result += user.name + ": " + user.todayStar + " stars. Week total: " + user.weekStar + " stars.\n";
+        controller.storage.users.save(user, function(err, id) {
+          // console.log("before")
         });
-        //send bot message when all leetcode query is finished
-        bot.reply(message, result);
-      });
-  });
-});
+    });
+  }
+    callback(result);
+    return new Promise((resolve, reject) => {
+        return resolve(all);
+        // return resolve([names, times, links]);
+    })
+}
+
+function afterOneDay(all, callback) {
+  bot.botkit.debug("in afterOneDay");
+  var result = "Today's progress:\n"
+
+  var index = 1;
+  //Sort all user's weekStar, init the leadborad.
+  all.sort(function(a,b){return b.weekStar - a.weekStar;});
+  all.forEach(function(node) {
+    controller.storage.users.get(node.id, function(err, user) {
+        result += index++ + ". " + user.name + ": " + user.todayStar + " stars. Week total: ";
+        user.weekStar += user.todayStar;
+        user.todayStar = 0;
+        user.todayCount = 0;
+        user.oldSubmissions = user.todaySubmissions;
+        user.todaySubmissions = [];
+        user.oldLinks = user.todayLinks;
+        user.todayLinks = [];
+        user.weekRank = index;
+        result += node.weekStar + " stars.\n";
+        controller.storage.users.save(user, function(err, id) {
+        });
+    });
+  })
+  callback(result);
+}
+function afterOneWeek(all, callback) {
+  bot.botkit.debug("in afterOneWeek");
+  var result = "This week's leaderboard:\n";
+  var index = 1;
+  //Sort all user's weekStar, init the leadborad.
+  all.sort(function(a,b){return b.weekStar - a.weekStar;});
+  all.forEach(function(node) {
+    controller.storage.users.get(node.id, function(err, user) {
+        user.star += user.weekStar;
+        user.weekStar = 0;
+        user.weekRank = 0;
+        result += index++ + ". " + node.name + ", " + node.weekStar + " stars.\n";
+        controller.storage.users.save(user, function(err, id) {
+        });
+    });
+  })
+  callback(result);
+}
+function countStars(count) {
+    var res = 0;
+    if (count >= 10) {
+        res = 5;
+    }
+    else if (count >= 5) {
+        res = 3;
+    }
+    else if (count >= 3 ) {
+        res = 2;
+    }
+    else if (count > 0 ) {
+        res = 1;
+    }
+    return res;
+}
 
 //hello cmd
 controller.hears(['hello', 'hi'], 'direct_message,direct_mention,mention', function(bot, message) {
@@ -265,6 +388,11 @@ controller.hears(['call me (.*)', 'my name is (.*)', 'sign up user (.*)'], 'dire
         if (!user) {
             user = {
                 id: message.user,
+                star: 0,
+                weekStar: 0,
+                todayStar: 0,
+                todayCount: 0,
+                todaySubmissions: [],
             };
         }
         user.name = name;
@@ -471,20 +599,4 @@ function formatUptime(uptime) {
 
     uptime = uptime + ' ' + unit;
     return uptime;
-}
-function countStars(count) {
-    var res = 0;
-    if (count >= 10) {
-        res = 5;
-    }
-    else if (count >= 5) {
-        res = 3;
-    }
-    else if (count >= 3 ) {
-        res = 2;
-    }
-    else if (count > 0 ) {
-        res = 1;
-    }
-    return res;
 }
