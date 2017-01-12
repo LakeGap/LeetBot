@@ -54,13 +54,11 @@ var hourlyJob = cron.job("0 */1 * * *", function(){
           // });
         });
       }).then(data => {
-        fs.appendFile("./log", "run 1 time\n", function(err) {
+        fs.appendFile("./log/cronlog", new Date() + "run hourlyJob\n", function(err) {
           if(err) {
               return console.log(err);
           }
-
-          console.log("The file was saved!");
-      });
+        });
       })
       .catch(function(error) {
         bot.botkit.debug(error);
@@ -98,7 +96,11 @@ var dailyJob = cron.job("00 55 23 * * 1-7", function(){
           // });
         });
       }).then(data => {
-        // console.log(data);
+        fs.appendFile("./log/cronlog", new Date() + "run dailyJob\n", function(err) {
+          if(err) {
+              return console.log(err);
+          }
+        });
       })
       .catch(function(error) {
         bot.botkit.debug(error);
@@ -360,7 +362,8 @@ function afterOneDay(all, callback) {
   all.forEach(function(node) {
     controller.storage.users.get(node.id, function(err, user) {
         result += index++ + ". " + user.name + ": " + user.todayStar + " stars. Week total: ";
-        user.weekStar += user.todayStar;
+        var ws = user.weekStar + user.todayStar;
+        user.weekStar += ws;
         user.todayStar = 0;
         user.todayCount = 0;
         user.oldSubmissions = user.todaySubmissions;
@@ -368,8 +371,13 @@ function afterOneDay(all, callback) {
         user.oldLinks = user.todayLinks;
         user.todayLinks = [];
         user.weekRank = index;
-        result += node.weekStar + " stars.\n";
+        result += ws + " stars.\n";
         controller.storage.users.save(user, function(err, id) {
+        });
+        fs.appendFile("./log/dayStarLog", new Date() + ": " + user.name + ", " + user.weekStar + "\n", function(err) {
+          if(err) {
+              return console.log(err);
+          }
         });
     });
   })
@@ -388,6 +396,11 @@ function afterOneWeek(all, callback) {
         user.weekRank = 0;
         result += index++ + ". " + node.name + ", " + node.weekStar + " stars.\n";
         controller.storage.users.save(user, function(err, id) {
+        });
+        fs.appendFile("./log/weekStarLog", new Date() + ": " + user.name + ", " + user.star + " rank:" + index - 1 + "\n", function(err) {
+          if(err) {
+              return console.log(err);
+          }
         });
     });
   })
