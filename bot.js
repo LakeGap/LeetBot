@@ -26,7 +26,9 @@ var bot = controller.spawn({
 var cron = require('cron');
 var timezone = 'America/new_york';
 
-var hourlyJob = cron.job("* * */1 * * *", function(){
+var fs = require('fs');
+
+var hourlyJob = cron.job("0 */1 * * *", function(){
     controller.storage.users.all(function(err, all) {
       //init with each user's url
       var urls = [];
@@ -51,7 +53,15 @@ var hourlyJob = cron.job("* * */1 * * *", function(){
           //   // handle error
           // });
         });
-      }).then(data => {console.log(data);})
+      }).then(data => {
+        fs.appendFile("./log", "run 1 time\n", function(err) {
+          if(err) {
+              return console.log(err);
+          }
+
+          console.log("The file was saved!");
+      });
+      })
       .catch(function(error) {
         bot.botkit.debug(error);
       });
@@ -87,7 +97,9 @@ var dailyJob = cron.job("00 55 23 * * 1-7", function(){
           //   // handle error
           // });
         });
-      }).then(data => {console.log(data);})
+      }).then(data => {
+        // console.log(data);
+      })
       .catch(function(error) {
         bot.botkit.debug(error);
       });
@@ -178,7 +190,9 @@ controller.hears(['status'], 'direct_message', function(bot, message) {
       return updateCurrentStatus(data, all, function(result) {
         bot.reply(message, result);
       });
-    }).then(data => {console.log(data);})
+    }).then(data => {
+      // console.log(data);
+    })
     .catch(function(error) {
       bot.botkit.debug(error);
     });
@@ -188,7 +202,7 @@ controller.hears(['status'], 'direct_message', function(bot, message) {
 controller.hears(['my progress'], 'direct_message', function(bot, message) {
   controller.storage.users.get(message.user, function(err, user) {
       var res = "";
-      console.log(user);
+      // console.log(user);
       if (user && user.name) {
          res += 'Hello ' + user.name + '\n';
          res += "Today's finishes: " + user.todayCount + ", which stands for " + user.todayStar + " stars \n";
@@ -320,7 +334,7 @@ function updateCurrentStatus (lists, all, callback) {
             }
           }
         }
-        console.log(count);
+        // console.log(count);
         user.todayCount += count;
         user.todayStar = countStars(user.todayCount);
         result += user.name + ": " + user.todayStar + " stars. Week total: " + user.weekStar + " stars.\n";
