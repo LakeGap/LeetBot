@@ -20,14 +20,13 @@ var controller = Botkit.slackbot({
 var bot = controller.spawn({
     token: process.env.LEETBOT_KEY
 }).startRTM();
-//bot.configureIncomingWebhook({url: 'https://hooks.slack.com/services/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'});
 
 //init time schedule package "cron"
 var cron = require('cron');
 var timezone = 'America/new_york';
 
 var fs = require('fs');
-
+//hourly job, refresh each user's progress.
 var hourlyJob = cron.job("0 */1 * * *", function(){
     controller.storage.users.all(function(err, all) {
       //init with each user's url
@@ -68,7 +67,7 @@ var hourlyJob = cron.job("0 */1 * * *", function(){
 undefined, true, timezone
 );
 hourlyJob.start();
-//init cron job
+//daily job, refresh each user's progress before star counting
 //00 55 23 * * 1-7 for everyday's 23:55, */10 * * * * * for every 10 sec
 var dailyJob = cron.job("00 55 23 * * 1-7", function(){
     controller.storage.users.all(function(err, all) {
@@ -110,7 +109,7 @@ var dailyJob = cron.job("00 55 23 * * 1-7", function(){
 undefined, true, timezone
 );
 dailyJob.start();
-
+//daily job,  count today's star
 var dailyJob2 = cron.job("00 57 23 * * 1-7", function(){
   controller.storage.users.all(function(err, all) {
       afterOneDay(all, function(result) {
@@ -128,7 +127,8 @@ undefined, true, timezone
 dailyJob2.start();
 
 //00 59 23 * * 7
-var weeklyJob = cron.job("00 59 23 * * 7", function(){
+//daily job, count week's star, give leaderboard
+var weeklyJob = cron.job("00 59 23 * * 0", function(){
   controller.storage.users.all(function(err, all) {
       afterOneWeek(all, function(result) {
         bot.say({
